@@ -12,5 +12,6 @@ Then the other step is splitting the Data into different parts for preprocessing
 ## Parts-Of-Speech training ##
 
 In this step, we make a Machine Learning/Deep Learning model to predict the results of our input.
-##FRONTEND##
+
+## FRONTEND ##
 JSON format output can be sent to the Frontend and can be displayed.
