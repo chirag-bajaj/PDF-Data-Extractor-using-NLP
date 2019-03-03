@@ -1,6 +1,6 @@
 # Atlantis #
 
-## Introduction ##
+## Aim ##
 
 ### An application that extracts the title, authors and abstract from the pdf of a research paper. ###
 
