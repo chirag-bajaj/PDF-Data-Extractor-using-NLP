@@ -1,4 +1,4 @@
-# Atlantis #
+# Atlantis - PDF Extractor #
 
 ## Aim ##
 
@@ -21,7 +21,7 @@ Authors of the research paper are listed in the beginning usually after the titl
 
 An abstract may be a temporary outline of a research article, thesis, review, conference continuing, or any in-depth analysis of a selected subject and is commonly accustomed facilitate the reader quickly ascertain the paper's purpose. The abstract will either be the content already present under the heading **Abstract** or will be a summary made by ML(NLP).
 
-## FRONTEND ##
+## Front End ##
 
 The pdf file will be selected by the user and sent to local host. JSON format file will be returned with the prediction of the title, authors and abstract. It will be sent to the frontend and will be displayed content-wise.
 
