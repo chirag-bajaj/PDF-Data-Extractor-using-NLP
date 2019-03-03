@@ -24,3 +24,7 @@ An abstract may be a temporary outline of a research article, thesis, review, co
 ## FRONTEND ##
 
 The pdf file will be selected by the user and sent to local host. JSON format file will be returned with the prediction of the title, authors and abstract. It will be sent to the frontend and will be displayed content-wise.
+
+## Conclusion ##
+
+The user will get an intuition of what the research paper is saying and who are the authors and what are its references. This helps user to get an interest in the topic discussed in the  research paper.
