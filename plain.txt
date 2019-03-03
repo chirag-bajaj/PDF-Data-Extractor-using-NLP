@@ -1,0 +1,929 @@
+CoCoNet: A Collaborative Convolutional Network
+
+Tapabrata Chakraborti1,2, Brendan McCane1, Steven Mills1, and Umapada Pal2
+
+1Dept. of Computer Science, University of Otago, NZ
+
+2CVPR Unit, Indian Statistical Institute, India
+
+January 29, 2019
+
+Abstract
+
+We present an end-to-end CNN architecture for ﬁne-grained visual recognition called Collaborative Convo-
+lutional Network (CoCoNet). The network uses a collaborative ﬁlter after the convolutional layers to represent
+an image as an optimal weighted collaboration of features learned from training samples as a whole rather than
+one at a time. This gives CoCoNet more power to encode the ﬁne-grained nature of the data with limited sam-
+ples in an end-to-end fashion. We perform a detailed study of the performance with 1-stage and 2-stage transfer
+learning and diﬀerent conﬁgurations with benchmark architectures like AlexNet and VggNet. The ablation study
+shows that the proposed method outperforms its constituent parts considerably and consistently. CoCoNet also
+outperforms the baseline popular deep learning based ﬁne-grained recognition method, namely Bilinear-CNN
+(BCNN) with statistical signiﬁcance. Experiments have been performed on the ﬁne-grained species recognition
+problem, but the method is general enough to be applied to other similar tasks. Lastly, we also introduce a new
+public dataset for ﬁne-grained species recognition, that of Indian endemic birds and have reported initial results
+on it. The training metadata and new dataset are available through the corresponding author.
+
+1 Introduction
+
+Deep convolutional networks have proven to be eﬀective in classifying base image categories with suﬃcient
+generalization when trained with a large dataset. However, many real life applications of signiﬁcance [1] may
+be characterized by ﬁne-grained classes and limited availability of data, like endangered species recognition or
+analysis of biomedical images of a rare pathology. In such specialized problems, it is challenging to eﬀectively
+train deep networks that are, by nature, data hungry. A case in point is that of ﬁne-grained endangered species
+recognition [2], where besides scarcity of training data, there are further bottlenecks like subtle inter-class object
+diﬀerences compared to signiﬁcant randomized background variation both between and within classes. This is
+illustrated in Fig. 1. Added to these, is the presence of the “long tail” problem [3], that is, signiﬁcant imbalance
+in samples per class (the frequency distribution of samples per class has long tail).
+Transfer learning is a popular approach to train on small ﬁne-grained image datasets with limited samples [4].
+The ConvNet architecture is trained ﬁrst on a large benchmark image dataset (e.g. ImageNet) for the task of
+
+9
+1
+0
+2
+
+ 
+
+n
+a
+J
+ 
+
+8
+2
+
+ 
+ 
+]
+
+V
+C
+.
+s
+c
+[
+ 
+ 
+
+1
+v
+6
+8
+8
+9
+0
+
+.
+
+1
+0
+9
+1
+:
+v
+i
+X
+r
+a
+
+(a)
+
+(b)
+
+(c)
+
+(d)
+
+Figure 1: (a)-(b) are images of Kea and (c)-(d) are images of Kaka. These are NZ endemic birds, very similar
+in appearance. Of these, Kaka is endangered and Kea is vulnerable. Note subtle diﬀerences and pose variations
+(roosting vs. in ﬂight).
+
+1
+
+Figure 2: Architecture of the proposed Collaborative ConvNet (CoCoNet). Training samples are divided into two
+partitions which collaborate to represent ﬁne-grained patterns. The collaborative cost function generates the error
+that optimizes its own parameters as well as ﬁne-tune the network weights in an end-to-end manner.
+
+base object recognition. The network is then ﬁne-tuned on the smaller target dataset for ﬁne-grained recognition.
+Since the target dataset is small, there is an increased chance of overtraining. On the other hand, if the dataset
+has ﬁne-grained objects with varying backgrounds, this can cause diﬃculty in training convergence. This makes
+the optimal training of the dataset challenging [3]. In case of small datasets with imbalanced classes, the problem
+is compounded by the probability of training bias in favour of larger classes. A few specialized deep learning
+methods have been proposed in recent times to cater to these issues, like low-shot/zero-shot learning [5] for small
+datasets and multi-staged transfer learning [4] for ﬁne-grained classes. In spite of these advances, deep learning
+of small ﬁne-grained datasets remains one of the open popular challenges of machine vision [6][7].
+Recently, Chakraborti et al. [8] demonstrated that collaborative ﬁlters can eﬀectively represent and classify small
+ﬁne-grained datasets, and applied it for clustering [24]. Collaborative ﬁlters have been the method of choice for
+recommender systems [19] and have recently also been used in vision systems like face recognition [9]. Cai et
+al. [10] have also recently shown that some modern versions of Collaborative Representation Classiﬁers (CRC)
+give better performance with CNN learned features from a pre-trained ConvNet compared to a fully-connected
+softmax based classiﬁcation layer [10].
+The intuition why collaborative ﬁltering works well to represent ﬁne-grained data is as follows. Collaborative
+representation classiﬁers (CRC) [9] represent the test image as an optimal weighted average of all training images
+across all classes. The predicted label is the class having least residual. This inter-class collaboration for opti-
+mal feature representation is distinct from the traditional purely discriminative approach. Thus the collaborative
+scheme not only takes advantages of diﬀerences between object categories but also exploits the similarities of ﬁne-
+grained data. Other advantages are that CRC is analytic since it has a closed form solution and is time eﬃcient
+since it does not need iterative or heuristic optimization. It is also a general feature representation-classiﬁcation
+scheme and thus most popular feature descriptors and ensembles thereof are compatible with it [25]. The present
+work advances the state-of-the-art by encoding the collaborative loss function into a deep CNN model. The con-
+tributions of this letter are two-fold.
+
+1. Collaborative ConvNet (CoCoNet): The proposed method ﬁne-tunes a pre-trained deep network through
+a collaborative representation classiﬁer in an end-to-end fashion. This establishes a protocol for multi-stage
+transfer learning of ﬁne-grained data with limited samples. We test it for ﬁne-grained species recognition.
+2. Indian Birds dataset: We introduce IndBirds, a new ﬁne-grained image benchmark of Indian endemic
+birds . It currently has 800 images of 8 classes (100 images per class). All experiments have been repeated
+on the new dataset and results are presented.
+
+2
+
+2 Collaborative Convolutional Network
+
+We ﬁrst present a brief description of the original collaborative representation classiﬁer (CRC) [9] and then the
+proposed Collaborative ConvNet (CoCoNet).
+
+2.1 Collaborative Representation Classiﬁer (CRC)
+Consider a training dataset with images in the feature space as X = [X1, . . . , Xc] ∈ (cid:146)d×n where n is the total
+number of samples over c classes and d is the feature dimension per sample. Thus Xi ∈ (cid:146)d×ni is the feature space
+
+representation of class i with ni samples such that(cid:80)c
+
+The CRC model reconstructs a test image in the feature space (cid:126)y ∈ (cid:146)d as an optimal collaboration of all training
+samples, while at the same time limiting the size of the reconstruction parameters, using the l2 regularisation term
+λ.
+The CRC cost function is given by:
+
+i=1 ni = n.
+
+J(α, λ) = (cid:107)(cid:126)y − Xα(cid:107)2
+
++ λ(cid:107)α(cid:107)2
+
+2
+
+2
+
+(1)
+
+where ˆα = [ ˆα1, . . . , ˆαc] ∈ (cid:146)N | ˆαi ∈ (cid:146)ni is the reconstruction matrix corresponding to class i.
+A least-squares derivation yields the optimal solution for α as:
+
+ˆα = (XT X + λI)−1XT(cid:126)y
+
+The representation residual of class i for test sample (cid:126)y can be calculated as:
+
+ri((cid:126)y) =
+
+The ﬁnal class of test sample (cid:126)y is thus given by
+
+(cid:107)(cid:126)y − Xi ˆαi(cid:107)2
+
+2
+
+(cid:107) ˆαi(cid:107)2
+
+2
+
+∀i ∈ 1, . . . , c
+
+C((cid:126)y) = arg min
+
+i
+
+ri((cid:126)y)
+
+The optimal value of λ is determined using gradient descent.
+
+2.2 Collaborative ConvNet (CoCoNet)
+
+(2)
+
+(3)
+
+(4)
+
+CoCoNet gives a collaborative cost which is back propagated through an end-to-end model. The training set is
+divided into two sections p1 and p2, having m and n images respectively randomly selected with equal represen-
+tation across classes.
+Let x be the d × 1 feature vector of one image in p1, such that the feature matrix for p1 is X of dimension d × m.
+Let y be the d × 1 feature vector of one image in p2, such that the feature matrix for p2 is Y of dimension d × n.
+The collaborative cost function is given by:
+
+P (A, W, X) = (cid:107)(Y − XA)W(cid:107)2
+
++ λ(cid:107)A(cid:107)2
+
++ γ(cid:107)W(cid:107)2
+
+(5)
+The collaborative reconstruction matrix A is thus of dimension m × n. The goal is to ﬁnd an optimal feature
+representation of each sample in p2 with respect to the “training” images in p1 via a representation vector (cid:126)ai ∈ A.
+The weight matrix W is used to compensate for imbalance of classes and each of its elements is initialised with a
+weight proportional to the size of the class to which the corresponding feature vector in Y belongs. W counteracts
+the imbalance in classes as a penalty term for larger classes by increasing the cost. W is of dimension n × 1.
+
+2
+
+2
+
+2
+
+3
+
+After ﬁnding the initial optimal A through least squares, it is then updated along with the weight matrix W through
+partial derivatives. The gradient of the feature matrix X is then used to update the CNN weights through back-
+propagation as presented in Algorithm 1.
+
+Least squares minimization gives the initial optimal value of A as:
+
+(cid:104)
+
+(cid:105)−1
+
+ˆA =
+
+XT XWT W + λI
+
+XT YWWT
+
+Fix(cid:8)A, X(cid:9), update W:
+Fix(cid:8)W, X(cid:9), update A:
+Fix(cid:8)W, A(cid:9), update X:
+
+= −(Y − XA)T (Y − XA)W + γW
+
+∂P
+∂W
+
+= −XT (Y − XA)WWT + λA
+
+∂P
+∂A
+
+= −(Y − XA)WWT AT
+
+∂P
+∂X
+
+(6)
+
+(7)
+
+(8)
+
+(9)
+
+Once all the partial derivatives are obtained, CNN weights are updated by standard back-propagation of gradients
+for each batch in P1 and P2. The training iterations are continued until the error stabilizes. A schematic of the
+CoCoNet architecture is presented in Fig. 2.
+
+Algorithm 1: Training with CoCoNet
+
+Fix(cid:8)A, X(cid:9), update W by eqn. 7 ;
+Fix(cid:8)W, X(cid:9), update A by eqn. 8 ;
+
+1 Initiate weight matrix W proportional to class size ;
+2 Split the training set into two parts P1 and P2 ;
+3 Extract feature matrix X of P1 through CNN section. ;
+4 Find initial optimal reconstruction matrix A by eqn. 6. ;
+5 for each sample in P2 do
+6
+7
+8
+9
+10
+11 end
+
+Back-propagate to update weights using eqn. 9 ;
+
+for each sample in P1 do
+
+end
+
+2.3 Reducing computation cost through SVD.
+The optimal representation weight matrix ˆA from eqn 6. has the term (XT XWT W + λI)−1, where X is of dimen-
+sion d × m. Here d is the dimension of the descriptor and m is the total number of data points in the partition
+P1 of training data. This poses the problem of high computation cost for large datasets (m is large). So we use
+singular value decomposition (SVD) to reduce the matrix inverse computation to dimension d× d, so as to make it
+independent of dataset size. This is a crucial modiﬁcation needed for applications like image retrieval from large
+unlabeled or weakly labeled image repositories.
+
+If we take the singular value decomposition (SVD) of XT , we can factor XT X as:
+
+XT X = (US VT )T US VT = VS T UT US VT = V(S 2)VT
+
+(10)
+
+4
+
+Since S only has d non-zero singular values, we can truncate S T S and V to be smaller matrices. So V is N × d, S
+is d × d and VT is d × N. Also note that since W is of dimension n × 1, WT W comes out as a scalar value in eqn.
+6, which is absorbed in S to have ˆS .
+Using the Woodbury matrix inverse identity [18], the inverse term becomes (V ˆS 2VT + λI)−1 which can be repre-
+sented as:
+
+Note that the inverse term ( ˆS −1 + 1
+
+1
+λ
+
++
+
+1
+
+1
+λ
+
+VT V)−1VT =
+
+λ2 V( ˆS −1 +
+I)−1VT
+λ I)−1 is only d × d, so it scales to many data points.
+
+λ2 V( ˆS −1 +
+
++
+
+1
+λ
+
+1
+λ
+
+1
+
+(11)
+
+2.4 Enhanced Learning by CoCoNet
+
+CoCoNet uses the collaborative cost function in an end-to-end manner. So we do not have the fully connected,
+energy loss function and softmax layers. The CNN extracts features and feeds it to the collaborative layer. The
+collaborative cost function estimates error, updates its own weights as well as feeds the error back to the CNN.
+The error and gradients are then back propagated through the CNN to update the weights. So CoCoNet is diﬀerent
+from just cascading a CNN based feature learner with a collaborative ﬁlter, because the weights are not updated
+in latter in an end-to-end fashion. For the same dataset and same number of given samples, the collaborative
+ﬁlter represents all samples together as an augmented feature vector. Thus after the error is calculated, the error
+gradients are then back propagated. This collaborative representation is not just the augmented feature matrix with
+all samples, it is also optimised by the collaborative ﬁlter. This adds an additional level of optimisation besides
+the CNN learned features, weights and tuned parameters.
+
+3 Experiments and Results
+
+3.1 Datasets
+
+Five benchmark image datasets are used in this work for pre-training and ﬁne-tuning in total.
+ImageNet [11] has about 1.4 million image categories and about 22k indexed sysnet as of 2017. It has been used
+for pre-training the networks as base category classiﬁers. Then for transfer learning, the following bird species
+recognition datasets have been used.
+NABirds [12] is a ﬁne-grained North American bird species recognition dataset developed by Cornell-UCSD-
+CalTech collaboration and maintained by the Cornell Lab of Ornithology. It is continually updated and at the time
+of use for this work had 555 classes and 48562 images. Due to the large number of images present in this dataset,
+it may be used for training a deep network from scratch as well as for transfer learning.
+CUB 200-2011 [13] dataset contains 11,788 images of 200 bird species. The main challenge of this dataset is con-
+siderable variation and confounding features in background information compared to subtle inter-class diﬀerences
+in birds.
+IndBirds is a new bird species recognition benchmark compiled as part of this work by the Indian Statistical
+Institute and University of Otago, NZ. The dataset contains images of 8 species of Indian endemic birds with
+around 100 images per class, collected from web repositories of birders and citizen scientists. The dataset is
+available for academic use from the lead author. Sample images of each class are presented in Fig. 4.
+NZBirds [14] is a small benchmark dataset of ﬁne-grained images of NZ endemic birds, many of which are
+endangered. Currently it contains 600 images of 30 NZ birds and has been compiled by University of Otago
+in collaboration with The National Museum of NZ (Te Papa), the Department of Conservation (DOC) and the
+Ornithological Society of NZ (Birds NZ).
+
+5
+
+Table 1: CUB 200-2011 Test Accuracy (%)
+
+ImageNet
+→ CUB
+(1 stage)
+
+NABirds
+→ CUB
+(1 stage)
+
+AlexNet
+
+52.2 ± 5.4
+57.5 ± 5.1
+AlexNet+CRC
+AlexNet+ProCRC 60.8 ± 5.3
+64.4 ± 5.2
+
+CoCoNet1
+
+Vgg16
+
+Vgg16+CRC
+
+Vgg16+ProCRC
+
+CoCoNet2
+
+Vgg19
+
+Vgg19+CRC
+
+Vgg19+ProCRC
+
+CoCoNet3
+
+60.1 ± 5.8
+66.3 ± 5.7
+69.4 ± 5.9
+73.7 ± 5.7
+
+71.9 ± 5.5
+76.2 ± 5.6
+79.3 ± 5.4
+83.6 ± 5.5
+
+55.4 ± 5.3
+59.9 ± 5.0
+63.5 ± 5.2
+67.0 ± 5.2
+
+63.9 ± 5.9
+70.2 ± 5.9
+72.6 ± 5.8
+75.8 ± 5.7
+
+74.1 ± 5.7
+79.0 ± 5.5
+82.5 ± 5.5
+87.4 ± 5.6
+
+ImageNet
+→ NABirds
+→ CUB
+(2 stage)
+58.6 ± 5.5
+61.3 ± 5.6
+65.5 ± 5.6
+69.4 ± 5.5
+
+66.4 ± 5.7
+72.9 ± 5.8
+77.7 ± 5.4
+81.5 ± 5.6
+
+77.5 ± 5.9
+80.2 ± 5.9
+83.8 ± 5.8
+89.1 ± 5.6
+
+Bilinear-CNN
+
+84.0 ± 5.3
+
+85.7 ± 5.8
+
+87.2 ± 5.5
+
+3.2 Competing Classiﬁers
+
+We evaluate the performance of CoCoNet against two popular recent methods both among collaborative repre-
+sentation classiﬁers (CRC) and deep convolutional neural networks (CNN), besides testing against constituent
+components in an ablation study. Among current CRC methods, we compare against the state-of-the-art Proba-
+bilistic CRC (ProCRC) [10]. Among recent deep CNN models, we choose the popular Bilinear CNN [20],[21] as
+the benchmark competitor.
+Of course, there are a few more recent variants of ProCRC, like enhanced ProcCRC (EProCRC) [22], as well
+as BCNN, like improved BCNN [23]. However, we have deliberately used the vanilla versions because the aim
+is to establish a baselne evaluation in this work. For the same reason we also compare with the original CRC
+formulation [9] plus two well-known benchmark CNN architectures: AlexNet by Krizhevsky et al. [15] and the
+more recent VGG16 and VGG19 by Simonyan et al. [16].
+
+6
+
+Table 2: IndBirds Test Accuracy (%)
+
+ImageNet
+→ IndBirds
+(1 stage)
+
+NABirds
+→ IndBirds
+(1 stage)
+
+AlexNet
+
+60.1 ± 4.4
+65.8 ± 4.8
+AlexNet+CRC
+AlexNet+ProCRC 70.5 ± 4.5
+73.3 ± 4.6
+
+CoCoNet1
+
+Vgg16
+
+Vgg16+CRC
+
+Vgg16+ProCRC
+
+CoCoNet2
+
+Vgg19
+
+Vgg19+CRC
+
+Vgg19+ProCRC
+
+CoCoNet3
+
+69.7 ± 4.8
+74.5 ± 4.7
+78.6 ± 4.1
+81.9 ± 4.7
+
+76.2 ± 4.2
+80.6 ± 4.4
+84.0 ± 4.9
+87.4 ± 4.3
+
+63.2 ± 4.7
+68.5 ± 4.5
+73.9 ± 4.9
+77.0 ± 4.7
+
+74.2 ± 4.1
+79.3 ± 4.4
+82.8 ± 4.3
+86.5 ± 4.4
+
+82.5 ± 4.7
+86.3 ± 4.0
+89.1 ± 4.1
+92.9 ± 4.4
+
+ImageNet
+→ NABirds
+→ IndBirds
+(2 stage)
+66.6 ± 4.5
+71.7 ± 4.8
+75.4 ± 4.7
+80.4 ± 4.4
+
+77.7 ± 4.5
+83.0 ± 4.6
+85.7 ± 4.1
+89.9 ± 4.3
+
+84.8 ± 4.2
+87.4 ± 4.4
+91.0 ± 4.2
+94.7 ± 4.5
+
+Bilinear-CNN
+
+85.1 ± 4.7
+
+88.6 ± 4.2
+
+91.5 ± 4.3
+
+Probabilistic CRC (ProCRC). Cai et al.
+[10] presented a probabilistic formulation (ProCRC) of the CRC
+method. Each of these probabilities are modeled by Gaussian exponentials and the probability of test image y
+belonging to a class k is expanded by chain rule using conditional probability. The ﬁnal cost function for ProCRC
+is formulated as maximisation of the joint probability of the test image belonging to each of the possible classes
+as independent events. The ﬁnal classiﬁcation is performed by checking which class has the maximum likelihood.
+
+J(α, λ, γ) = (cid:107)y − Xα(cid:107)2
+
+2
+
++ λ(cid:107)α(cid:107)2
+
+2
+
++
+
+γ
+K
+
+(cid:107)Xα − Xkαk(cid:107)2
+
+2
+
+(12)
+
+Bilinear CNN. Maji et al. introduced the BCNN architecture for ﬁne-grained visual recognition [20],[21]. These
+
+7
+
+K(cid:88)
+
+k=1
+
+Table 3: NZBirds Test Accuracy (%)
+
+ImageNet
+→ NZBirds
+(1 stage)
+
+NABirds
+→ NZBirds
+(1 stage)
+
+AlexNet
+
+49.9 ± 5.6
+54.4 ± 5.5
+AlexNet+CRC
+AlexNet+ProCRC 57.5 ± 5.8
+62.2 ± 5.2
+
+CoCoNet1
+
+Vgg16
+
+Vgg16+CRC
+
+Vgg16+ProCRC
+
+CoCoNet2
+
+Vgg19
+
+Vgg19+CRC
+
+Vgg19+ProCRC
+
+CoCoNet3
+
+55.7 ± 5.9
+59.6 ± 5.6
+63.1 ± 5.7
+68.3 ± 5.1
+
+61.5 ± 5.0
+63.9 ± 5.3
+66.2 ± 5.5
+71.8 ± 5.2
+
+52.3 ± 5.4
+58.1 ± 5.7
+61.9 ± 5.9
+66.6 ± 5.6
+
+57.9 ± 5.6
+60.4 ± 5.5
+66.5 ± 5.8
+69.8 ± 5.3
+
+63.7 ± 5.1
+66.1 ± 5.5
+71.3 ± 5.1
+74.4 ± 5.2
+
+ImageNet
+→ NABirds
+→ NZBirds
+(2 stage)
+55.0 ± 5.8
+60.4 ± 5.8
+65.8 ± 5.5
+69.7 ± 5.7
+
+59.8 ± 5.3
+62.7 ± 5.1
+68.1 ± 5.5
+71.6 ± 5.4
+
+65.6 ± 5.7
+68.7 ± 5.6
+72.9 ± 5.8
+77.2 ± 5.6
+
+Bilinear-CNN
+
+69.4 ± 5.6
+
+71.8 ± 5.5
+
+73.3 ± 5.0
+
+networks represent an image as a pooled outer product of features learned from two CNNs and encode localized
+feature interactions that are translationally invariant. B-CNN is a type of orderless texture representations that can
+be trained in an end-to-end manner.
+
+3.3 Experiments
+
+We train each of the three target datasets (CUB, NZBirds, IndBirds) through a combination of one stage and two
+stage transfer learning. For one stage transfer learning, two separate conﬁgurations have been used: 1) the network
+is pre-trained for general object recognition on ImageNet and then ﬁne-tuned on the target dataset; 2) the network
+is pre-trained for bird recognition on the large north american bird dataset (NABirds) and then ﬁne-tuned on the
+target dataset. For two stage training, the network is trained successively on ImageNet, NABirds and then the
+
+8
+
+target dataset. Note that for pre-training, always the original architecture (AlexNet/VggNet) is used, CoCoNet
+only comes into play during ﬁne-tuning. Also note that the conﬁgurations with AlexNet, VGG16 and VGG19
+are named CoCoNet1, CoCoNet2 and CoCoNet3 respectively. During both pre-training and ﬁne-tuning, we start
+with 0.001 learning rate, but shift to 0.0001 once there is no change in loss anymore, keeping the total number
+of iterations/epochs constant at 1000 and using the Adam [17] optimiser. We investigate how the end-to-end
+formulation of CoCoNet fares in controlled experiments with competing conﬁgurations. We perform the same
+experiments using the original architecture (AlexNet/VggNet), then we observe change in accuracy with cascaded
+CNN+CRC and the end-to-end CoCoNet. We also further tabulate the results with cascaded CNN+ProCRC as
+well as Bilinear CNN [23]. For each dataset, images are resized to 128×128 and experiments are conducted with
+ﬁve-fold cross validation.
+
+3.4 Results and Analysis
+
+Percentage classiﬁcation accuracies along with standard deviation are presented in Table 1 (CUB), Table 2 (In-
+dBirds) and Table 3 (NZBirds) with the highest accuracy in each column highlighted in bold. It may be readily
+observed from the tabulated results, that the proposed method overall outperforms its competitors, including the
+recent probabilistic CRC (ProCRC) and the popular bilinear CNN (BCNN). This performance is reﬂected across
+the three datasets and two stage transfer learning performs better than one stage for all classiﬁers. Further insights
+into the results are provided below.
+Ablation Study. The tabulated results also serve as an ablation study in the sense that we compare the proposed
+end-to-end CoCoNet with its constituent sections and combinations thereof with parts removed. CoCoNet with the
+CNN section as AlexNet, Vgg16Net and Vgg19Net are named CoCoNet1, CoCoNet2 and CoCoNet3 respectively.
+Now consider the case of CoCoNet1 which is the proposed Collaborative ConvNet with AlexNet as the CNN
+feature learner with the collaborative cost layer integrated for classiﬁcation in an end-to-end manner. For the
+ablation study, we compare with i) just a direct AlexNet with the standard Softmax classﬁer and ii) AlexNet as pre-
+trained feature extractor cascaded with a collaborative classiﬁer (CRC) but not integrated. CoCoNet1 outperforms
+both of them as well as AlexNet cascaded with probabilistic CRC (ProCRC), which is a more recent collaborative
+classiﬁer.
+Statistical Analysis. We perform the Signed Binomial Test to investigate the statistical signiﬁcance of the im-
+provement in performance of CoCoNet3 (best among the conﬁgurations) vs. BCNN, since these have the closest
+performances. It can can be used across diﬀerent datasets and methods simultaneously because it considers fre-
+quency of success in the calculations rather than assuming a gaussian distribution of accuracy values (like t-tests).
+We have considered CoCoNet3, that is the conﬁguration using VGG-19 network as that is the best performing.
+The null hypothesis is that the two are equally good, that is there is 50% chance of each beating the other on any
+particular trial. For each of the three datasets (CUB, NZBirds and Indbirds), there are three transfer learning con-
+ﬁgurations (two single stage and a double stage) and ﬁve-fold cross-validated results. Thus over the three datasets,
+in total we have 45 experiments of CoCoNet vs. BCNN, and out of these CoCoNet outperformed the latter 33
+times (that is 73.33% of the trials). The signed binomial test yields that given the assumption that both methods
+are equally good, then the probability of CoCoNet outperforming BCNN in 73.33% of the trials is 0.12% (one-tail
+p-value of 0.0012). Considering a level of signiﬁcance of α = 0.05, we have to apply the Bonferroni adjustment.
+We have 3 transfer learning protocols and 3 datasets: hence 9 combinations of experimental condition. So we
+divide the 5% level of signiﬁcance by 9 to get adjusted α = 0.0055. Since the one-tail p-value obtained is less than
+0.0055, it may be concluded that the improvement in accuracy is statistically signiﬁcant considering the frequency
+of out-performance.
+Qualitative Results. Fig. 3(a) is that of a Malabar Lark, which is one of the species in the IndBirds dataset. One
+of the key distinguishing parts of the Malabar Lark is its head crest. Fig. 3(b) is an image of the Nilgiri Pipit
+from the same dataset. Fig. 3(c) presents a test image of the Malabar Lark that was misclassiﬁed as a Nilgiri Pipit
+by the proposed CoCoNet as well as its nearest competitors: Bilinear CNN as well as cascaded CNN+ProCRC.
+It can be seen that in that image, due to the pose of the bird, the discriminative head crest is not clearly visible.
+Fig. 3(d) and 3(e) are those of Nilgiri Pipit, while 3(f) is that of Rufous Babbler. It can be seen from 3(d) that the
+Nilgiri Pipit is characterised by distinct dark patterns on its back, which is not clearly visible from the front, as
+shown in Fig. 3(e). The image in Fig. 3(e) was correctly classiﬁed by the proposed CoCoNet as Nilgiri Pipit but
+was misclassiﬁed by its competitors (cascaded CNN+ProCRC and BCNN) as Rufous Babbler.
+
+9
+
+(a)
+
+(b)
+
+(d)
+
+(e)
+
+(c)
+
+(f)
+
+Figure 3: Classiﬁcation and Misclassiﬁcation Examples from the new IndBirds dataset: (a) Malabar Lark, (b)
+Nilgiri Pipit, (c) Malabar Lark, misclassiﬁed as Nilgiri Pipit by both proposed CoCoNet and competitors, due
+to obfuscation of the discriminating head crest.
+(d) Nilgiri Pipit with characteristic dark pattern on back (e)
+Front-facing image of Nilgiri Pipit with back patterns not visible. Correctly classiﬁed by proposed CoCoNet but
+misclassiﬁed by competitors as Rufous Babbler (f).
+
+4 Conclusion
+
+We present an end-to-end collaborative convolutional network (CoCoNet) architecture for ﬁne-grained visual
+recognition with limited samples. The new architecture adds a collaborative representation which adds an ad-
+ditional level of optimization based on collaboration of images across classes, the information is then back-
+propagated to update CNN weights in an end-to-end fashion. This collaborative representation exploits the ﬁne-
+grained nature of the data better with fewer training images. The proposed network is evaluated for the task of
+ﬁne-grained bird species recognition, but the method is general enough to perform other ﬁne-grained classiﬁcation
+tasks like detection of rare pathology from medical images. The other major advantage is that most existing CNN
+architectures can be easily restructured into the proposed conﬁguration. We have also presented a new ﬁne-grained
+benchmark dataset with images of endemic Indian birds, and have reported results on it. Results indicate that the
+proposed algorithm performs much better than its constiutent parts, a recent CRC method (probabilistic CRC:
+ProCRC) and a benchmark deep network method (Bilinear-CNN: BCNN).
+
+References
+
+[1] Y. Chai. Advances in Fine-grained Visual Categorization. University of Oxford, 2015.
+[2] E. Rodner, M. Simon, G. Brehm, S. Pietsch, J.-W.Wgele, and J. Denzler. Fine-grained Recognition Datasets
+
+for Biodiversity Analysis. In Proc. CVPR, 2015.
+
+10
+
+[3] G. V. Horn and P. Perona, “The Devil
+
+arXiv:1709.01450 [cs.CV], 2017.
+
+is in the Tails: Fine-grained Classiﬁcation in the Wild”,
+
+[4] M. Simon and E. Rodner, “Neural Activation Constellations: Unsupervised Part Model Discovery with Con-
+
+volutional Networks”, In Proc. ICCV, 2015.
+
+[5] A. Li, Z. Lu, L. Wang, T. Xiang, X. Li, J-R Wen, “Zero-Shot Fine-Grained Classiﬁcation by Deep Feature
+
+Learning with Semantics”, arXiv:1707.00785 [cs.CV], 2017.
+
+[6] J. Krause, T. Gebru, J. Deng, L.-J.Li,and F.-F. Li. Learning Features and Parts for Fine-Grained Recognition.
+
+In Proc. ICPR, 2014.
+
+[7] J. Krause, H. Jin, J. Yang, and F.-F.Li. Fine-grained recognition without part annotations. In Proc. CVPR,
+
+2015.
+
+[8] T. Chakraborti, B. McCane, S. Mills, and U. Pal, “A Generalised Formulation for Collaborative Representation
+
+of Image Patches (GP-CRC)”, In Proc. BMVC, 2017.
+
+[9] L. Zhang, M. Yang, and X. Feng. Sparse representation or collaborative representation: Which helps face
+
+recognition? In Proc. ICCV, 2011.
+
+[10] S. Cai, L. Zhang, W. Zuo, and X. Feng. A probabilistic collaborative representation based approach for
+
+pattern classiﬁcation. In In Proc. CVPR, 2016.
+
+[11] O. Russakovsky, J. Deng, H. Su, J. Krause, S. Satheesh, S. Ma, Z. Huang, A. Karpathy, A. Khosla, M.
+Bernstein, A. C. Berg, and Li Fei-Fei, “ImageNet Large Scale Visual Recognition Challenge,” International
+Journal of Computer Vision, 2015.
+
+[12] G. V. Horn, S. Branson, R. Farrell, S. Haber, J. Barry, P. Ipeirotis, P. Perona, S. J. Belongie, “Building a bird
+recognition app and large scale dataset with citizen scientists: The ﬁne print in ﬁne-grained dataset collection
+”, In Proc. CVPR, 2015.
+
+[13] C. Wah, S. Branson, P. Welinder, P. Perona, and S. Belongie. The caltech-ucsd birds-200-2011 dataset.
+
+http://www.vision.caltech.edu/visipedia/CUB-200-2011.html.
+
+[14] T. Chakraborti, B. McCane, S. Mills, and U. Pal, “Collaborative representation based ﬁne-grained species
+
+recognition”, In Proc. IVCNZ, 2016.
+
+[15] A. Krizhevsky, I. Sutskever, G. E. Hinton, “ImageNet Classiﬁcation with Deep Convolutional Neural Net-
+
+works”, In Proc. NIPS, 2012.
+
+[16] K. Simonyan and A. Zisserman. Very deep convolutional networks for large-scale image recognition. In
+
+Proc. ICLR, 2014.
+
+[17] D. P. Kingma and J. Ba, “Adam: A Method for Stochastic Optimization”, In Proc. ICLR, 2015.
+[18] M. A. Woodbury, “Inverting modiﬁed matrices”, Memorandum report, vol. 42, no. 106, pp. 336, 1950.
+[19] J. B. Schafer, D. Frankowski, J. Herlocker and S. Sen, “Collaborative Filtering Recommender Systems”, The
+
+Adaptive Web, Lecture Notes in Computer Science, Springer, vol. 4321, pp. 291-324, 2018.
+
+[20] T-Y Lin, A. RoyChowdhury, and S. Maji, “Bilinear Convolutional Neural Networks for Fine-Grained Visual
+
+Recognition”, IEEE Trans. Pattern Anal. Mach. Intell., vol. 40, no. 6, pp. 1309-1322, 2018.
+
+[21] T-Y Lin, A. RoyChowdhury, S. Maji, “Bilinear CNN Models for Fine-Grained Visual Recognition”, In Proc.
+
+ICCV, pp. 1449-1457, 2015.
+
+[22] R. Lan and Y. Zhou, “An extended probabilistic collaborative represen-tation based classiﬁer for image
+
+classiﬁcation”, In Proc. IEEE Intl. Conf.on Multimedia and Expo (ICME), 2017.
+
+[23] T-Y Lin, and S. Maji, “Improved Bilinear Pooling with CNNs”, In Proc. BMVC, 2017.
+[24] T. Chakraborti, B. McCane, S. Mills and U. Pal, “Fine-grained Collaborative K-Means Clustering”, In Proc.
+
+IVCNZ, 2018.
+
+[25] T. Chakraborti, B. McCane, S. Mills and U. Pal, “LOOP Descriptor: Local Optimal Oriented Pattern”, Signal
+
+Processing Letters, vol. 25, no. 5, pp. 635-639, 2018.
+
+11
+
+Nilgiri Wood Pigeon
+
+Nigiri Fly Catcher
+
+Malabar Grey Hornbill
+
+Nilgiri Pipit
+
+Forest Owlet
+
+Rufous Babbler
+
+Malabar Lark
+
+Black and Orange Flycatcher
+
+Figure 4: New IndBirds dataset: 8 endemic Indian birds; 100 images per classs
+
+12
+
+
