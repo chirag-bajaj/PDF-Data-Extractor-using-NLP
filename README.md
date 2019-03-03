@@ -15,7 +15,7 @@ Title of a research paper is usually given in beginning of the paper. But there 
 
 ## Authors ##
 
-Authors of the research paper are listed in the beginning usually after the title. But they have wierd indentation and also sometimes contains the name of the company/institute/school/laboratory. So if **Authors** are not available directly, they will be found using NLP.
+Authors of the research paper are listed in the beginning usually after the title. But they have weird indentation and also sometimes contains the name of the company/institute/school/laboratory. So if **Authors** are not available directly, they will be found using NLP.
 
 ## Abstract ##
 
