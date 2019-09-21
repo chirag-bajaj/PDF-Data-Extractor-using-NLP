@@ -4,7 +4,7 @@
 - Branch: Information Technology
 - Roll Number: 17BIT034
 
-## Chirag Baja ##
+## Chirag Bajaj ##
 
 - College: Institute of tecchnology, Nirma University
 - Branch: Information Technology
